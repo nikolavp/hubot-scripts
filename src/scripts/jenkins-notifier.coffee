@@ -26,6 +26,7 @@
 url = require('url')
 querystring = require('querystring')
 
+
 buildStatusChanged = (data, @failing) ->
   if data.build.status == 'FAILURE' and data.name in @failing
     return false
@@ -50,7 +51,7 @@ shouldNotify = (notstrat, data, @failing) ->
 
 module.exports = (robot) ->
 
-  robot.router.post "/hubot/jenkins-notify", (req, res) ->
+  robot.router.put "/hubot/jenkins-notify", (req, res) ->
 
     @failing ||= []
     query = querystring.parse(url.parse(req.url).query)
@@ -63,23 +64,23 @@ module.exports = (robot) ->
     if query.type
       envelope.user = {type: query.type}
 
+    jenkins_url = process.env.HUBOT_JENKINS_URL
     try
       data = req.body
-
-      if data.build.phase == 'FINISHED' or data.build.phase == 'FINALIZED'
+      if data.build.phase == 'FINISHED' || data.build.phase == 'FINALIZED' || data.build.phase == 'COMPLETED'
         if data.build.status == 'FAILURE'
           if data.name in @failing
             build = "is still"
           else
             build = "started"
-          robot.send envelope, "#{data.name} build ##{data.build.number} #{build} failing (#{encodeURI(data.build.full_url)})" if shouldNotify(envelope.notstrat, data, @failing)
+          robot.send envelope, "#{data.name} build ##{data.build.number} #{build} failing (#{jenkins_url}/#{encodeURI(data.build.url)})" if shouldNotify(envelope.notstrat, data, @failing)
           @failing.push data.name unless data.name in @failing
         if data.build.status == 'SUCCESS'
           if data.name in @failing
             build = "was restored"
           else
             build = "succeeded"
-          robot.send envelope, "#{data.name} build ##{data.build.number} #{build} (#{encodeURI(data.build.full_url)})"  if shouldNotify(envelope.notstrat, data, @failing)
+          robot.send envelope, "#{data.name} build ##{data.build.number} #{build} (#{jenkins_url}/#{encodeURI(data.build.url)})"  if shouldNotify(envelope.notstrat, data, @failing)
           index = @failing.indexOf data.name
           @failing.splice index, 1 if index isnt -1
 
